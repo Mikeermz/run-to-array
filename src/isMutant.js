@@ -1,80 +1,141 @@
-const isMutant = (dna) => {
-  let count = 0;
-  const regex = /(A{4}|T{4}|C{4}|G{4})/gi;
-  for (let i = 0; i < dna.length; i++) {
-    if (dna[i].length !== dna.length) {
-      return false;
+class MutantDetector {
+  constructor(seq) {
+    this.minSize = 4;
+    this.seq = seq.map(element => element.toUpperCase());
+    this.isValidSeq = this.validateSeq();
+    this.isValidSeqSize = this.validateSeqSize();
+    this.numMutantSeq = 0;
+    this.minMutantSeq = 2;
+    this.isMutant = false;
+    this.mutantSeq = new Set(['AAAA', 'TTTT', 'CCCC', 'GGGG']);
+    this.visitedSeq = new Set();
+  }
+
+  validateSeq() {
+    const regex = /^[ATCG]+$/;
+    let validate = true
+
+    for (const element of this.seq) {
+      if (!regex.test(element)) {
+        validate = false
+        break;
+      }
     }
-    let matches = dna[i].match(regex);
-    if (matches) {
-      count += matches.length;
+
+    return validate
+  }
+
+  validateSeqSize() {
+    const colSize = this.seq.length;
+    const rowSize = colSize > 0 ? this.seq[0].length : 0;
+    
+    return colSize >= this.minSize && rowSize >= this.minSize;
+  }
+
+  getHorizontalSubSeq(row, colS, colE) {
+    const subSeq = this.seq[row].substring(colS, colE + 1);
+    return subSeq;
+  }
+
+  getVerticalSubSeq(col, rowS, rowE) {
+    const subSeq = [];
+
+    for (let row = rowS; row <= rowE; row++) {
+      subSeq.push(this.seq[row][col]);
     }
-    for (let j = 0; j < dna[i].length; j++) {
-      if (
-        dna[i][j] !== "A" &&
-        dna[i][j] !== "T" &&
-        dna[i][j] !== "C" &&
-        dna[i][j] !== "G"
-      ) {
-        return false;
-      }
-      let column = "";
-      for (let k = 0; k < dna.length; k++) {
-        column += dna[k][j];
-      }
-      matches = column.match(regex);
-      if (matches) {
-        count += matches.length;
-      }
+
+    return subSeq.join('');
+  }
+
+  getDiagonalSubSeq(rowS, rowE, colS, colE) {
+    const subSeq = [];
+    const colStep = rowS > rowE ? -1 : 1;
+
+    let row = rowS;
+    let col = colS;
+
+    while (row <= rowE && (col >= colE || col <= colE)) {
+      subSeq.push(this.seq[row][col]);
+
+      row += 1;
+      col += colStep;
+    }
+
+    return subSeq.join('');
+  }
+
+  getSubSeq(rowS, rowE, colS, colE) {
+    if (rowS === rowE) {
+      return this.getHorizontalSubSeq(rowS, colS, colE);
+    } else if (colS === colE) {
+      return this.getVerticalSubSeq(colS, rowS, rowE);
+    } else {
+      return this.getDiagonalSubSeq(rowS, rowE, colS, colE);
     }
   }
-  for (let i = 0; i < dna.length; i++) {
-    for (let j = 0; j < dna[i].length; j++) {
-      if (
-        i > 2 &&
-        j < dna[i].length - 3 &&
-        dna[i][j] === dna[i - 1][j + 1] &&
-        dna[i - 1][j + 1] === dna[i - 2][j + 2] &&
-        dna[i - 2][j + 2] === dna[i - 3][j + 3]
-      ) {
-        count++;
-      }
-      // Comprobamos si hay una secuencia de cuatro letras iguales en diagonal hacia arriba a la izquierda
-      if (
-        i > 2 &&
-        j > 2 &&
-        dna[i][j] === dna[i - 1][j - 1] &&
-        dna[i - 1][j - 1] === dna[i - 2][j - 2] &&
-        dna[i - 2][j - 2] === dna[i - 3][j - 3]
-      ) {
-        count++;
+
+  detectSubSeqMutant(subseq) {
+    if (this.mutantSeq.has(subseq)) {
+      this.numMutantSeq += 1;
+      this.isMutant = this.numMutantSeq >= this.minMutantSeq;
+    }
+  }
+
+  validateSubSeqs(row, col) {
+    const lastRow = row + this.minSize - 1;
+    const lastCol = col + this.minSize - 1;
+
+    const subseqs = [
+      [row, row, col, lastCol], // Top horizontal
+      [row, lastRow, col, col], // Left vertical
+      [row, lastRow, col, lastCol], // Diagonal top to bottom
+      [row, lastRow, lastCol, col], // Diagonal bottom to top
+      [lastRow, lastRow, col, lastCol], // Bottom horizontal
+      [row, lastRow, lastCol, lastCol], // Right vertical
+    ];
+
+    for (let i = 0; i < subseqs.length; i += 1) {
+      const seq = subseqs[i].join('');
+      if (this.visitedSeq.has(seq)) {
+        continue;
+      } else {
+        this.visitedSeq.add(seq);
       }
 
-      // Comprobamos si hay una secuencia de cuatro letras iguales en diagonal hacia abajo a la derecha
-      if (
-        i < dna.length - 3 &&
-        j < dna[i].length - 3 &&
-        dna[i][j] === dna[i + 1][j + 1] &&
-        dna[i + 1][j + 1] === dna[i + 2][j + 2] &&
-        dna[i + 2][j + 2] === dna[i + 3][j + 3]
-      ) {
-        count++;
+      const [row, lastRow, col, lastCol] = subseqs[i];
+
+      if (lastRow >= this.seq.length || lastCol > this.seq[0].length) {
+        continue;
       }
-      // Comprobamos si hay una secuencia de cuatro letras iguales en diagonal hacia abajo a la izquierda
-      if (
-        i < dna.length - 3 &&
-        j > 2 &&
-        dna[i][j] === dna[i + 1][j - 1] &&
-        dna[i + 1][j - 1] === dna[i + 2][j - 2] &&
-        dna[i + 2][j - 2] === dna[i + 3][j - 3]
-      ) {
-        count++;
-      }
+
+      const subseq = this.getSubSeq(
+        row,
+        lastRow,
+        col,
+        lastCol,
+      );
+      this.detectSubSeqMutant(subseq);
+
+      if (this.isMutant) break;
     }
   }
-  // Devolvemos true si encontramos dos o más secuencias de cuatro letras iguales, false en caso contrario
-  return count >= 2;
+
+  detectIsMutant() {
+    if (!this.isValidSeq) return 'Invalid Character';
+    if (!this.isValidSeqSize) return 'Invalid Sequence';
+
+    for (let row = 0; row < this.seq.length; row += 1) {
+      if (this.isMutant) break;
+
+      for (let col = 0; col < this.seq[0].length; col += 1) {
+        if (this.isMutant) break;
+        this.validateSubSeqs(row, col);
+      }
+    }
+
+    return this.isMutant;
+  }
 };
   
-export default isMutant;
+export default MutantDetector;
   
